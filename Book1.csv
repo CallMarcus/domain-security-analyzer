@@ -1,0 +1,7 @@
+﻿Action,Zone,Record Name,Record Type,TTL,Value,Comments
+--- contoso.com ---,,,,,,Domain configuration
+REMOVE,contoso.com,@,MX,,10 custmx.cscdns.net.,Remove existing MX record
+ADD,contoso.com,@,TXT,3600,v=spf1 -all,SPF hard fail
+ADD,contoso.com,@,MX,3600,0 .,Null MX (RFC 7505)
+ADD,contoso.com,*._domainkey,TXT,3600,v=DKIM1; p=,DKIM wildcard with empty key
+ADD,contoso.com,_dmarc,CNAME,3600,reject.dmarc.fabrikam.com.,DMARC reject policy via CNAME
