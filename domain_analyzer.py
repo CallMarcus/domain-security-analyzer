@@ -8,7 +8,6 @@ def check_required_modules():
     
     try:
         import dns.resolver
-        import dns.zone
     except ImportError:
         missing_modules.append('dnspython')
     
@@ -23,23 +22,21 @@ def check_required_modules():
         for module in missing_modules:
             print(f"  - {module}")
         
-        print(f"\nInstallation command:")
+        print("\nInstallation command:")
         print(f"  pip install {' '.join(missing_modules)}")
-        print(f"\nOr if using pip3:")
+        print("\nOr if using pip3:")
         print(f"  pip3 install {' '.join(missing_modules)}")
-        print(f"\nIf using a virtual environment, activate it first and then run the pip command.")
+        print("\nIf using a virtual environment, activate it first and then run the pip command.")
         sys.exit(1)
 
 # Check modules before importing
 check_required_modules()
 
 import dns.resolver
-import dns.zone
 import requests
 import concurrent.futures
 import csv
-from urllib.parse import urlparse
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 class DomainAnalyzer:
     def __init__(self):
