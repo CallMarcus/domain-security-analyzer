@@ -74,6 +74,23 @@ The generated CSV includes the following columns:
 - Redirect Chain
 - HTTP Error
 
+## Parked Domain CSV Generator
+
+The `scripts/parked_domain_csv.py` helper script creates DNS change records for
+locking down parked or non-mailing domains. Provide a text file of domains and
+an output CSV path:
+
+```bash
+python scripts/parked_domain_csv.py domains.txt parked_domains.csv
+```
+
+Each domain receives the following DNS entries:
+
+- SPF record with `-all`
+- Null MX record
+- DKIM wildcard with an empty key
+- DMARC CNAME pointing to a reject policy
+
 ## License
 
 This project is released under the MIT License. See [LICENSE](LICENSE) for details.
