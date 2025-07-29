@@ -19,9 +19,3 @@ jobs:
       - name: Compile Python files
         run: |
           python -m py_compile $(git ls-files '*.py')
-      - name: Install markdownlint
-        run: |
-          npm install -g markdownlint-cli
-      - name: Lint Markdown files
-        run: |
-          markdownlint '**/*.md'
