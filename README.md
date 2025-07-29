@@ -1,14 +1,21 @@
 # Domain Security Analyzer
 
-This repository contains a Python script for assessing basic security configurations of domain names. The tool performs DNS lookups, subdomain enumeration, and HTTP checks to help identify potential configuration issues.
+This repository contains a Python script for assessing basic security
+configurations of domain names. The tool performs DNS lookups, subdomain
+enumeration, and HTTP checks to help identify potential configuration issues.
 
 ## Features
 
-- Validates that required Python packages are available before running the analysis. If dependencies are missing the script prints the packages to install and exits.
+- Validates that required Python packages are available before running the
+  analysis. If dependencies are missing the script prints the packages to
+  install and exits.
 - Looks up SPF, DKIM and DMARC TXT records.
-- Retrieves SOA information for the parent domain including the primary nameserver and administrative contact.
-- Discovers common subdomains and detects wildcard DNS entries. Known hosting provider patterns are matched from discovered CNAMEs.
-- Checks if the domain is reachable over HTTP and whether it redirects to HTTPS, storing the full redirect chain.
+- Retrieves SOA information for the parent domain including the primary
+  nameserver and administrative contact.
+- Discovers common subdomains and detects wildcard DNS entries. Known
+  hosting provider patterns are matched from discovered CNAMEs.
+- Checks if the domain is reachable over HTTP and whether it redirects to
+  HTTPS, storing the full redirect chain.
 - Processes multiple domains in parallel and outputs the results to a CSV file.
 
 ## Requirements
