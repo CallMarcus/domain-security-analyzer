@@ -92,6 +92,7 @@ v=DMARC1; p=quarantine; pct=25; rua=mailto:dmarc@example.com
 # Apply to all messages (default if omitted)
 v=DMARC1; p=reject; pct=100; rua=mailto:dmarc@example.com
 ```
+**Note**: The `pct` tag affects the application of `p=` and `sp=` policies but does not affect reporting. Aggregate reports (`rua`) will still cover 100% of messages regardless of the `pct` value.
 
 ## Alignment Options
 
@@ -154,10 +155,12 @@ v=DMARC1; p=none; ruf=mailto:forensics@example.com,mailto:security@example.com
 
 Controls when forensic reports are sent:
 
-- **`0`**: DKIM and SPF fail (default)
-- **`1`**: DKIM or SPF fail
-- **`d`**: DKIM fail
-- **`s`**: SPF fail
+- **`0`**: Report if all underlying authentication mechanisms (SPF and DKIM) fail to produce an aligned "pass" result (default).
+- **`1`**: Report if any underlying authentication mechanism (SPF or DKIM) produced something other than an aligned "pass" result.
+- **`d`**: Report if the DKIM signature failed validation, regardless of its alignment.
+- **`s`**: Report if the SPF evaluation failed, regardless of its alignment.
+
+**Note**: The `fo` tag is only effective when a `ruf` URI is also specified in the DMARC record.
 
 ```dns
 # Report any authentication failure

@@ -220,7 +220,19 @@ selector._domainkey.example.com TXT "v=DKIM1; k=rsa; p=..."
 selector._domainkey.example.com TXT "v=DKIM1; k=rsa; p=PUBLIC_KEY_HERE"
 ```
 
-### 5. Forgetting Subdomain Keys
+### 5. Using Test Mode in Production
+
+The `t=y` flag indicates that the DKIM record is in testing mode. Verifiers may ignore the DKIM signature if this flag is present, even if the signature is valid. This flag should not be used for production keys.
+
+```dns
+# WRONG: Production key in test mode
+prod._domainkey.example.com TXT "v=DKIM1; t=y; p=..."
+
+# CORRECT: Remove t=y for production
+prod._domainkey.example.com TXT "v=DKIM1; p=..."
+```
+
+### 6. Forgetting Subdomain Keys
 
 ```dns
 # Main domain key

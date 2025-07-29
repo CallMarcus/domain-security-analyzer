@@ -182,7 +182,11 @@ v=spf1 include:provider1.com include:provider2.com mx a -all
 v=spf1 ip4:192.0.2.0/24 include:_spf.google.com -all
 ```
 
-### 2. Multiple SPF Records
+### 2. Void Lookup Limit (2 Lookups)
+
+In addition to the 10-lookup limit, there is a separate limit of 2 "void" lookups. A void lookup occurs when a DNS query for a mechanism (like `include:` or `exists:`) returns no records (an NXDOMAIN or NODATA response). Exceeding this limit will cause a PermError, invalidating the SPF check. This often happens with misspelled domains or when a third-party service is removed without updating the SPF record.
+
+### 3. Multiple SPF Records
 
 Only ONE SPF record per domain is allowed:
 
@@ -195,7 +199,7 @@ example.com TXT "v=spf1 include:mail.protection.outlook.com ~all"
 example.com TXT "v=spf1 include:_spf.google.com include:mail.protection.outlook.com ~all"
 ```
 
-### 3. Syntax Errors
+### 4. Syntax Errors
 
 Common syntax mistakes:
 
@@ -213,7 +217,7 @@ Common syntax mistakes:
 "v=spf1 ip4:192.0.2.1 -all"
 ```
 
-### 4. Trailing Dots in Includes
+### 5. Trailing Dots in Includes
 
 Be careful with DNS notation:
 
@@ -225,7 +229,7 @@ v=spf1 include:_spf.google.com. -all
 v=spf1 include:_spf.google.com -all
 ```
 
-### 5. Circular References
+### 6. Circular References
 
 Avoid circular include references:
 
@@ -236,6 +240,7 @@ domainA.com: v=spf1 include:domainB.com -all
 # Domain B includes Domain A (CIRCULAR!)
 domainB.com: v=spf1 include:domainA.com -all
 ```
+**Note**: Circular references can lead to infinite loops and SPF validation failures.
 
 ## SPF for Different Scenarios
 
