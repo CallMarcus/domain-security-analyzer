@@ -1,4 +1,4 @@
-# CSC Global DNS Template - DMARC Project Sample Records
+# DNS Template - DMARC Project Sample Records
 
 ## Sample Records Summary
 
