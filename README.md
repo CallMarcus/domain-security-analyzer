@@ -37,7 +37,7 @@ Please install the following packages:
 
 ## Usage
 
-Prepare a text file with one domain per line, for example `domains.txt`:
+Prepare a text file with one domain per line, for example `examples/domains.txt`:
 
 ```text
 contoso.com
@@ -47,13 +47,13 @@ rzy.domain.com
 Run the analyzer and specify the output CSV file:
 
 ```bash
-python domain_analyzer.py domains.txt report.csv
+python domain_analyzer.py examples/domains.txt report.csv
 ```
 
 You can optionally set the number of parallel workers:
 
 ```bash
-python domain_analyzer.py domains.txt report.csv 20
+python domain_analyzer.py examples/domains.txt report.csv 20
 ```
 
 The generated CSV includes the following columns:
@@ -88,13 +88,13 @@ locking down parked or non-mailing domains. Provide a text file of domains and
 an output CSV path:
 
 ```bash
-python scripts/parked_domain_csv.py domains.txt parked_domains.csv
+python scripts/parked_domain_csv.py examples/domains.txt parked_domains.csv
 ```
 
 Pass `--dmarc-cname` to override the default DMARC CNAME target:
 
 ```bash
-python scripts/parked_domain_csv.py domains.txt parked_domains.csv --dmarc-cname reject.dmarc.contoso.com.
+python scripts/parked_domain_csv.py examples/domains.txt parked_domains.csv --dmarc-cname reject.dmarc.contoso.com.
 ```
 
 Each domain receives the following DNS entries:
