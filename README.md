@@ -91,12 +91,18 @@ an output CSV path:
 python scripts/parked_domain_csv.py domains.txt parked_domains.csv
 ```
 
+Pass `--dmarc-cname` to override the default DMARC CNAME target:
+
+```bash
+python scripts/parked_domain_csv.py domains.txt parked_domains.csv --dmarc-cname reject.dmarc.contoso.com.
+```
+
 Each domain receives the following DNS entries:
 
 - SPF record with `-all`
 - Null MX record
 - DKIM wildcard with an empty key
-- DMARC CNAME pointing to a reject policy
+- DMARC CNAME pointing to a reject policy (customizable via `--dmarc-cname`)
 
 ## License
 
