@@ -1,4 +1,4 @@
-# Domain Security Analyzer
+# Domain DNS Record Security Analyzer
 
 This repository contains a Python script for assessing basic security
 configurations of domain names. The tool performs DNS lookups, subdomain
