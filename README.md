@@ -6,7 +6,7 @@ A comprehensive Python tool for analyzing domain security configurations includi
 
 ### **Core Security Analysis**
 - **Email Security**: Comprehensive SPF, DKIM, and DMARC record analysis
-- **DNS Security**: SOA record validation, subdomain discovery, and wildcard DNS detection
+- **DNS Security**: SOA record validation, subdomain discovery, and wildcard DNS detection (filters wildcard-derived subdomains)
 - **SSL/TLS Assessment**: HTTP to HTTPS redirect validation and certificate analysis
 - **Hosting Intelligence**: Automatic hosting provider identification from CNAME patterns
 
@@ -91,6 +91,7 @@ The generated CSV includes comprehensive security analysis with **29 columns**:
 - SOA Exists, SOA Record, Primary NS, Admin Email
 - Discovered Subdomains, CNAME Records
 - Has Wildcard DNS, Hosting Provider
+  - Note: When wildcard DNS is detected, subdomains whose answers match the wildcard baseline (A or CNAME) are suppressed to avoid listing non-existent subdomains. Explicit CNAMEs and A records differing from the wildcard baseline are included.
 
 ### **Email Security**
 - SPF Exists, SPF Record
@@ -188,3 +189,35 @@ awk -F',' '$24=="True" && $27<100 {print $1}' results.csv
 ## License
 
 This project is released under the MIT License. See [LICENSE](LICENSE) for details.
+### Optional flags
+
+- `--include-wildcard-matches`
+  - Include subdomains whose DNS answers match the wildcard baseline (A or CNAME).
+  - Default behavior filters these out to avoid listing non-existent subdomains.
+
+- `--filtered-subdomains-file <path>`
+  - Writes a separate CSV with subdomains excluded due to wildcard filtering.
+  - Columns: `Domain`, `Filtered Subdomains` (comma-separated).
+
+Examples:
+
+```bash
+# Include wildcard-matched subdomains
+python domain_analyzer.py examples/domains.txt report.csv --include-wildcard-matches
+
+# Save filtered subdomains to a separate CSV while keeping main CSV schema unchanged
+python domain_analyzer.py examples/domains.txt report.csv --filtered-subdomains-file filtered.csv
+
+# Combine with explicit worker count
+python domain_analyzer.py examples/domains.txt report.csv 20 --filtered-subdomains-file filtered.csv
+```
+
+## Wildcard Filtering
+
+- Default behavior filters subdomains that only resolve due to wildcard DNS. The analyzer establishes a baseline by querying a random label and comparing A and CNAME answers.
+- Inclusion rules:
+  - Include explicit CNAMEs unless they match the wildcard CNAME baseline.
+  - Include A records when they differ from the wildcard A baseline.
+- Use `--include-wildcard-matches` to disable filtering and include all matches.
+- Use `--filtered-subdomains-file <path>` to export filtered items for auditing.
+- Caveat: If an explicit host’s A rrset is identical to the wildcard A baseline, it will be filtered by default. Use `--include-wildcard-matches` or audit via the filtered CSV if needed.

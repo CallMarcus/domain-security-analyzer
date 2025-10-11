@@ -69,6 +69,10 @@ The domain analyzer scans for:
 | **Hash Algorithms** | Detected algorithms (sha256, sha384, sha512) | `SRI Algorithms Used` |
 | **Parsing Errors** | Issues during analysis | `SRI Error` |
 
+### Wildcard Filtering Note
+- Subdomain discovery filters out hosts that only resolve due to wildcard DNS by comparing answers against a wildcard baseline (A and CNAME). This prevents non-existent subdomains from skewing SRI coverage.
+- Use `--include-wildcard-matches` to disable filtering, or `--filtered-subdomains-file` to export filtered items for audit.
+
 ### Example Analysis Results
 
 ```csv

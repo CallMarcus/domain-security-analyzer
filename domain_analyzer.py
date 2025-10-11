@@ -51,10 +51,12 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 
 class DomainAnalyzer:
-    def __init__(self):
+    def __init__(self, include_wildcard_matches: bool = False, collect_filtered: bool = False):
         self.resolver = dns.resolver.Resolver()
         self.resolver.timeout = 5
         self.resolver.lifetime = 5
+        self.include_wildcard_matches = include_wildcard_matches
+        self.collect_filtered = collect_filtered
         
         # Common subdomain prefixes to check
         self.common_subdomains = [
@@ -148,32 +150,66 @@ class DomainAnalyzer:
     def discover_subdomains(self, domain: str) -> Dict:
         """Discover subdomains using various methods."""
         found_subdomains = set()
+        filtered_subdomains = set()
         cname_records = {}
+
+        # Helper to normalize DNS rrsets for comparison
+        def _norm_rrset(rrset: Optional[List[str]]) -> Optional[tuple]:
+            if not rrset:
+                return None
+            try:
+                return tuple(sorted(str(r).strip().lower() for r in rrset))
+            except Exception:
+                return tuple(sorted(rrset))
         
+        # Establish wildcard baseline answers (if any)
+        try:
+            random_sub = f"wildcard-test-{datetime.now().strftime('%Y%m%d%H%M%S')}.{domain}"
+            wildcard_a = self.get_dns_record(random_sub, 'A')
+            wildcard_cname = self.get_dns_record(random_sub, 'CNAME')
+            has_wildcard = bool(wildcard_a or wildcard_cname)
+            wildcard_a_norm = _norm_rrset(wildcard_a)
+            wildcard_cname_norm = _norm_rrset(wildcard_cname)
+        except Exception:
+            has_wildcard = False
+            wildcard_a_norm = None
+            wildcard_cname_norm = None
+
         # Check common subdomains
         for subdomain in self.common_subdomains:
             fqdn = f"{subdomain}.{domain}"
             try:
-                # Check for A record
-                a_records = self.get_dns_record(fqdn, 'A')
-                if a_records:
-                    found_subdomains.add(fqdn)
-                
-                # Check for CNAME record
+                # Prefer explicit CNAMEs
                 cname = self.get_dns_record(fqdn, 'CNAME')
-                if cname:
-                    found_subdomains.add(fqdn)
-                    cname_records[fqdn] = cname[0]
-            except:
-                continue
+                a_records = self.get_dns_record(fqdn, 'A')
 
-        # Check for wildcard DNS
-        try:
-            random_sub = f"wildcard-test-{datetime.now().strftime('%Y%m%d%H%M%S')}.{domain}"
-            wildcard_records = self.get_dns_record(random_sub, 'A')
-            has_wildcard = bool(wildcard_records)
-        except:
-            has_wildcard = False
+                include = False
+
+                if cname:
+                    # Include CNAMEs unless they match the wildcard CNAME baseline
+                    if has_wildcard and _norm_rrset(cname) == wildcard_cname_norm and not self.include_wildcard_matches:
+                        include = False
+                        if self.collect_filtered:
+                            filtered_subdomains.add(fqdn)
+                    else:
+                        include = True
+                        cname_records[fqdn] = cname[0]
+                elif a_records:
+                    # If wildcard is present, suppress A-only results that
+                    # exactly match the wildcard baseline to avoid false positives
+                    if has_wildcard:
+                        if self.include_wildcard_matches or _norm_rrset(a_records) != wildcard_a_norm:
+                            include = True
+                        else:
+                            if self.collect_filtered:
+                                filtered_subdomains.add(fqdn)
+                    else:
+                        include = True
+
+                if include:
+                    found_subdomains.add(fqdn)
+            except Exception:
+                continue
 
         # Identify hosting provider
         hosting_provider = None
@@ -189,7 +225,8 @@ class DomainAnalyzer:
             "subdomains": list(found_subdomains),
             "cname_records": cname_records,
             "has_wildcard_dns": has_wildcard,
-            "hosting_provider": hosting_provider
+            "hosting_provider": hosting_provider,
+            "filtered_subdomains": list(filtered_subdomains)
         }
 
     def check_http_redirect(self, domain: str) -> tuple[Dict, str]:
@@ -397,7 +434,7 @@ class DomainAnalyzer:
             "sri": sri_info
         }
 
-def analyze_domains_from_file(input_file: str, output_file: str, max_workers: int = 10):
+def analyze_domains_from_file(input_file: str, output_file: str, max_workers: int = 10, *, include_wildcard_matches: bool = False, filtered_subdomains_file: Optional[str] = None):
     """Analyze multiple domains from a file and save results to CSV."""
     
     # Read domains from input file
@@ -410,7 +447,7 @@ def analyze_domains_from_file(input_file: str, output_file: str, max_workers: in
     def analyze_single_domain(domain: str) -> Dict:
         """Worker function for parallel processing"""
         nonlocal completed
-        analyzer = DomainAnalyzer()  # Create new instance for thread safety
+        analyzer = DomainAnalyzer(include_wildcard_matches=include_wildcard_matches, collect_filtered=bool(filtered_subdomains_file))  # Create new instance for thread safety
         try:
             result = analyzer.analyze_domain(domain)
         except Exception as e:
@@ -423,7 +460,7 @@ def analyze_domains_from_file(input_file: str, output_file: str, max_workers: in
                 "spf": {"exists": False, "record": None},
                 "dkim": {"exists": False, "records": []},
                 "dmarc": {"exists": False, "record": None},
-                "subdomains": {"subdomains": [], "cname_records": {}, "has_wildcard_dns": False, "hosting_provider": None},
+                "subdomains": {"subdomains": [], "cname_records": {}, "has_wildcard_dns": False, "hosting_provider": None, "filtered_subdomains": []},
                 "http_redirect": {"http_accessible": False, "redirects_to_https": False, "final_url": None, "error": str(e), "redirect_chain": []},
                 "sri": {"sri_enabled": False, "total_external_resources": 0, "resources_with_sri": 0, "sri_coverage_percentage": 0, "missing_sri_count": 0, "sri_algorithms_used": [], "error": "Domain analysis failed"}
             }
@@ -531,6 +568,16 @@ def analyze_domains_from_file(input_file: str, output_file: str, max_workers: in
                 r['sri']['error']
             ])
 
+    # Optionally write filtered subdomains to a separate CSV
+    if filtered_subdomains_file:
+        with open(filtered_subdomains_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Domain', 'Filtered Subdomains'])
+            for r in results:
+                filtered = r.get('subdomains', {}).get('filtered_subdomains', [])
+                if filtered:
+                    writer.writerow([r['domain'], ','.join(filtered)])
+
 if __name__ == "__main__":
     import platform
     import os
@@ -550,8 +597,8 @@ if __name__ == "__main__":
             pass
 
     if len(sys.argv) < 3:
-        print("Usage: python domain_analyzer.py input_file.txt output_file.csv [max_workers]")
-        print("max_workers: Optional, default is 10")
+        print("Usage: python domain_analyzer.py input_file.txt output_file.csv [max_workers] [--include-wildcard-matches] [--filtered-subdomains-file path]")
+        print("max_workers: Optional, default is OS-dependent")
         sys.exit(1)
     
     input_file = sys.argv[1]
@@ -559,7 +606,38 @@ if __name__ == "__main__":
     
     # Adjust default workers based on OS and CPU count
     default_workers = min(10, (os.cpu_count() or 4) * 2)
-    max_workers = int(sys.argv[3]) if len(sys.argv) > 3 else default_workers
+    max_workers = None
+    include_wildcard_matches = False
+    filtered_subdomains_file = None
+
+    # Parse optional args
+    remaining = sys.argv[3:]
+    # First, try to parse a positional max_workers if it's an int
+    if remaining:
+        try:
+            max_workers = int(remaining[0])
+            remaining = remaining[1:]
+        except ValueError:
+            max_workers = None
+
+    max_workers = max_workers or default_workers
+
+    i = 0
+    while i < len(remaining):
+        arg = remaining[i]
+        if arg == '--include-wildcard-matches':
+            include_wildcard_matches = True
+            i += 1
+        elif arg == '--filtered-subdomains-file':
+            if i + 1 >= len(remaining):
+                print("Error: --filtered-subdomains-file requires a path argument")
+                sys.exit(1)
+            filtered_subdomains_file = os.path.normpath(remaining[i+1])
+            i += 2
+        else:
+            print(f"Unrecognized argument: {arg}")
+            print("Usage: python domain_analyzer.py input_file.txt output_file.csv [max_workers] [--include-wildcard-matches] [--filtered-subdomains-file path]")
+            sys.exit(1)
     
     # Ensure input/output files use proper path separators
     input_file = os.path.normpath(input_file)
@@ -569,10 +647,15 @@ if __name__ == "__main__":
     print(f"Operating System: {platform.system()} {platform.release()}")
     print(f"Input file: {input_file}")
     print(f"Output file: {output_file}")
-    print(f"Workers: {max_workers}\n")
+    print(f"Workers: {max_workers}")
+    if include_wildcard_matches:
+        print("Include wildcard-matched subdomains: True")
+    if filtered_subdomains_file:
+        print(f"Filtered subdomains file: {filtered_subdomains_file}")
+    print("")
     
     try:
-        analyze_domains_from_file(input_file, output_file, max_workers)
+        analyze_domains_from_file(input_file, output_file, max_workers, include_wildcard_matches=include_wildcard_matches, filtered_subdomains_file=filtered_subdomains_file)
     except KeyboardInterrupt:
         print("\nAnalysis interrupted by user. Partial results may have been saved.")
     except Exception as e:

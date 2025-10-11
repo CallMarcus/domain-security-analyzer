@@ -18,6 +18,13 @@ Domain,Timestamp,Parent Domain,SOA Exists,SRI Enabled,Total External Resources,S
 github.com,2025-01-15T10:30:45.123456,github.com,True,False,71,0.0...
 ```
 
+Optional auxiliary output (when `--filtered-subdomains-file` is used):
+
+```csv
+Domain,Filtered Subdomains
+example.com,www.example.com,blog.example.com
+```
+
 ## Column Reference
 
 ### **Basic Domain Information**
@@ -56,6 +63,8 @@ github.com,2025-01-15T10:30:45.123456,github.com,True,False,71,0.0...
 | `CNAME Records` | String | Subdomain to CNAME mappings | `www.github.com:github.github.io.,api.github.com:api-lb.github.com.` |
 | `Has Wildcard DNS` | Boolean | Wildcard DNS configuration detected | `True`, `False` |
 | `Hosting Provider` | String | Detected hosting service | `AWS`, `Google Cloud`, `Cloudflare`, `null` |
+
+Note: When wildcard DNS is present, the analyzer filters out subdomains that resolve solely due to wildcard records by comparing answers against a wildcard baseline (for A and CNAME). Subdomains are included when they have explicit CNAMEs or when their A answers differ from the wildcard baseline. Use `--include-wildcard-matches` to disable this filter, or `--filtered-subdomains-file` to export filtered items separately.
 
 ### **Web Security Analysis**
 
