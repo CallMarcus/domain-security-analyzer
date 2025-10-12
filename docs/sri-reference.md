@@ -144,11 +144,13 @@ following are true:
 - Third-party resources load over insecure HTTP
 - Cross-origin resources omit the required `crossorigin` attribute
 
-The `scripts/sri_parser.py` helper crawls same-origin pages, inventories each
-external JavaScript and CSS include, and produces a report listing every
-resource that violates one or more of the checks above. The output includes the
-page URL, resource URL, recorded integrity/crossorigin values, and concise
-reason codes so the risky includes can be triaged quickly.
+The `scripts/sri_parser.py` helper inspects the requested page by default so the
+results align with SecurityScorecard's single-page scanner. Enable the
+`--crawl` flag to follow same-origin pages, inventory each external JavaScript
+and CSS include, and produce a report listing every resource that violates one
+or more of the checks above. The output includes the page URL, resource URL,
+recorded integrity/crossorigin values, and concise reason codes so the risky
+includes can be triaged quickly.
 
 ### Compensating Controls
 

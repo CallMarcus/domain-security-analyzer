@@ -51,8 +51,8 @@ class SRIParser:
     def __init__(
         self,
         base_url: str,
-        max_depth: int = 1,
-        max_pages: int = 25,
+        max_depth: int = 0,
+        max_pages: int = 1,
         timeout: int = 10,
         user_agent: str = "SRI-Parser/1.0 (+https://github.com/security-domain/domain-security-analyzer)",
     ) -> None:
@@ -271,12 +271,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Crawl a site and report unsafe Subresource Integrity implementations.",
     )
     parser.add_argument("url", help="Base URL or domain to crawl")
-    parser.add_argument("--max-depth", type=int, default=1, help="Maximum crawl depth (default: 1)")
+    parser.add_argument(
+        "--crawl",
+        action="store_true",
+        help="Follow same-origin links up to --max-depth/--max-pages",
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=1,
+        help="Maximum crawl depth when --crawl is set (default: 1)",
+    )
     parser.add_argument(
         "--max-pages",
         type=int,
         default=25,
-        help="Maximum number of same-origin pages to visit (default: 25)",
+        help="Maximum number of same-origin pages to visit when --crawl is set (default: 25)",
     )
     parser.add_argument(
         "--timeout",
@@ -333,8 +343,8 @@ def main() -> None:
 
     sri_parser = SRIParser(
         base_url=args.url,
-        max_depth=args.max_depth,
-        max_pages=args.max_pages,
+        max_depth=args.max_depth if args.crawl else 0,
+        max_pages=args.max_pages if args.crawl else 1,
         timeout=args.timeout,
     )
     report = sri_parser.crawl()
