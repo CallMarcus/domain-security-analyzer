@@ -150,6 +150,34 @@ Each domain receives the following DNS entries:
 - DKIM wildcard with an empty key
 - DMARC CNAME pointing to a reject policy (customizable via `--dmarc-cname`)
 
+## Unsafe SRI Parser
+
+Use `scripts/sri_parser.py` when you need a focused crawl that inventories
+"unsafe" Subresource Integrity implementations called out by
+[SecurityScorecard's guidance](https://support.securityscorecard.com/hc/en-us/articles/41067186972827-Unsafe-Implementation-of-Subresource-Integrity-SRI).
+The script walks same-origin links, inspects third-party JavaScript and CSS
+includes, and reports every resource that:
+
+- Omits an `integrity` attribute entirely
+- Supplies hashes that do not start with `sha256-`, `sha384-`, or `sha512-`
+- Mixes valid and invalid hash values
+- Loads over plain HTTP
+- Uses a different origin without the required `crossorigin` attribute
+
+The crawler also records any restrictive `Content-Security-Policy` headers so
+you can tell whether a compensating control is in place.
+
+```bash
+# Human-readable output
+python scripts/sri_parser.py https://example.com
+
+# JSON report with a deeper crawl (depth 2, up to 50 pages)
+python scripts/sri_parser.py https://example.com --max-depth 2 --max-pages 50 --json
+```
+
+The report lists the affected page, resource URL, integrity/crossorigin values,
+and short reason codes for each unsafe include.
+
 ## Documentation
 
 ### **Reference Guides**
