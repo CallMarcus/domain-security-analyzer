@@ -132,6 +132,38 @@ bootstrap.com,True,4,4,100.0
    - SRI not required for same-domain resources
    - Focus on external CDN and third-party resources
 
+### Unsafe Implementation Signals
+
+SecurityScorecard categorizes an SRI deployment as "unsafe" when any of the
+following are true:
+
+- The external resource lacks an `integrity` attribute entirely
+- Integrity values use unsupported algorithms (anything other than SHA-256,
+  SHA-384, or SHA-512)
+- A mixture of valid and invalid hash tokens appear in the same attribute
+- Third-party resources load over insecure HTTP
+- Cross-origin resources omit the required `crossorigin` attribute
+
+The `scripts/sri_parser.py` helper crawls same-origin pages, inventories each
+external JavaScript and CSS include, and produces a report listing every
+resource that violates one or more of the checks above. The output includes the
+page URL, resource URL, recorded integrity/crossorigin values, and concise
+reason codes so the risky includes can be triaged quickly.
+
+### Compensating Controls
+
+SecurityScorecard allows a restrictive `Content-Security-Policy` to compensate
+for missing SRI. When crawling, the SRI parser records any CSP headers and
+flags the presence of a `script-src` (or `default-src`) directive that:
+
+- Avoids permissive tokens such as `*`, `http:`, `https:`, `data:`,
+  `'unsafe-inline'`, and `'unsafe-eval'`
+- Provides a concrete allowlist (e.g., `'self'`, hostnames, or nonce/hash-based
+  sources)
+
+If such a policy is detected, the report highlights that a compensating control
+is present even when unsafe includes remain.
+
 ## Generating SRI Hashes
 
 ### Command Line Tools
