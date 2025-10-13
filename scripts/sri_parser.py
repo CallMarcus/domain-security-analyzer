@@ -76,6 +76,7 @@ class SRIParser:
         self.to_visit: collections.deque[Tuple[str, int]] = collections.deque([(self.base_url, 0)])
         self.unsafe_resources: List[UnsafeResource] = []
         self.csp_policies: List[Tuple[str, str, str]] = []  # (page_url, header_name, policy_value)
+        self.resources_with_integrity: List[Dict[str, object]] = []
 
     # ------------------------------------------------------------------
     # Crawling helpers
@@ -140,10 +141,26 @@ class SRIParser:
         parsed = urlparse(resource_url)
         reasons: List[str] = []
 
-        if not integrity:
-            reasons.append("missing-integrity")
-        else:
+        valid_hashes: List[str] = []
+        invalid_hashes: List[str] = []
+
+        if integrity:
             valid_hashes, invalid_hashes = self._parse_integrity_tokens(integrity)
+            self.resources_with_integrity.append(
+                {
+                    "page_url": page_url,
+                    "resource_url": resource_url,
+                    "tag_type": tag_type,
+                    "integrity": integrity,
+                    "crossorigin": crossorigin,
+                    "valid_hashes": valid_hashes,
+                    "invalid_hashes": invalid_hashes,
+                }
+            )
+        else:
+            reasons.append("missing-integrity")
+
+        if integrity:
             if not valid_hashes:
                 reasons.append("invalid-integrity-hash")
             elif invalid_hashes:
@@ -262,6 +279,8 @@ class SRIParser:
                 {"page_url": page_url, "header": header, "value": policy}
                 for page_url, header, policy in self.csp_policies
             ],
+            "resources_with_integrity_count": len(self.resources_with_integrity),
+            "resources_with_integrity": self.resources_with_integrity,
         }
         return report
 
@@ -299,16 +318,25 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Output the report as JSON instead of human-readable text",
     )
+    parser.add_argument(
+        "--list-sri",
+        action="store_true",
+        help="List all external resources that include an integrity attribute",
+    )
     return parser
 
 
-def print_report(report: Dict[str, object], as_json: bool = False) -> None:
+def print_report(report: Dict[str, object], as_json: bool = False, list_all: bool = False) -> None:
     if as_json:
         print(json.dumps(report, indent=2))
         return
 
     print(f"SRI Parser report for {report['base_url']}")
     print(f"Pages crawled: {report['pages_crawled']}")
+    print(
+        "SRI resources with integrity attribute: "
+        f"{report['resources_with_integrity_count']}"
+    )
     print()
 
     if report["compensating_control_detected"]:
@@ -336,6 +364,23 @@ def print_report(report: Dict[str, object], as_json: bool = False) -> None:
         for entry in report["csp_policies"]:
             print(f"- {entry['page_url']} [{entry['header']}] -> {entry['value']}")
 
+    if list_all:
+        print()
+        if report["resources_with_integrity"]:
+            print("All resources with integrity attributes:")
+            for entry in report["resources_with_integrity"]:
+                valid = ", ".join(entry["valid_hashes"]) or "None"
+                invalid = ", ".join(entry["invalid_hashes"]) or "None"
+                print(f"- {entry['resource_url']} ({entry['tag_type']})")
+                print(f"  Page: {entry['page_url']}")
+                print(f"  Integrity: {entry['integrity']}")
+                print(f"  Crossorigin: {entry['crossorigin'] or 'None'}")
+                print(f"  Valid hashes: {valid}")
+                print(f"  Invalid hashes: {invalid}")
+                print()
+        else:
+            print("No resources with integrity attributes detected.")
+
 
 def main() -> None:
     parser = build_arg_parser()
@@ -348,7 +393,7 @@ def main() -> None:
         timeout=args.timeout,
     )
     report = sri_parser.crawl()
-    print_report(report, as_json=args.json)
+    print_report(report, as_json=args.json, list_all=args.list_sri)
 
 
 if __name__ == "__main__":
