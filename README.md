@@ -156,9 +156,10 @@ Use `scripts/sri_parser.py` when you need a focused crawl that inventories
 "unsafe" Subresource Integrity implementations called out by
 [SecurityScorecard's guidance](https://support.securityscorecard.com/hc/en-us/articles/41067186972827-Unsafe-Implementation-of-Subresource-Integrity-SRI).
 By default the scanner inspects only the requested page so the results mirror
-SecurityScorecard's behaviour. Add the `--crawl` flag to follow same-origin
-links, inspect third-party JavaScript and CSS includes across multiple pages,
-and report every resource that:
+SecurityScorecard's behaviour. The summary now also reports how many external
+resources already include an `integrity` attribute. Add the `--crawl` flag to
+follow same-origin links, inspect third-party JavaScript and CSS includes across
+multiple pages, and report every resource that:
 
 - Omits an `integrity` attribute entirely
 - Supplies hashes that do not start with `sha256-`, `sha384-`, or `sha512-`
@@ -173,12 +174,17 @@ you can tell whether a compensating control is in place.
 # Human-readable output for the landing page only
 python scripts/sri_parser.py https://example.com
 
+# List every external include that already uses SRI
+python scripts/sri_parser.py https://example.com --list-sri
+
 # JSON report with a deeper crawl (depth 2, up to 50 pages)
 python scripts/sri_parser.py https://example.com --crawl --max-depth 2 --max-pages 50 --json
 ```
 
 The report lists the affected page, resource URL, integrity/crossorigin values,
-and short reason codes for each unsafe include.
+and short reason codes for each unsafe include. When `--list-sri` is supplied the
+output also enumerates each external script and stylesheet that defines an
+`integrity` attribute.
 
 ## Documentation
 
