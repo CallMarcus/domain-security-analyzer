@@ -43,6 +43,13 @@ dependencies = [
     "beautifulsoup4>=4.11.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "build",
+    "twine",
+]
+
 [project.urls]
 Homepage = "https://github.com/CallMarcus/domain-security-analyzer"
 Repository = "https://github.com/CallMarcus/domain-security-analyzer"
