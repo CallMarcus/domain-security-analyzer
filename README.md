@@ -1,5 +1,10 @@
 # Domain Security Analyzer
 
+[![PyPI version](https://img.shields.io/pypi/v/domain-security-analyzer.svg)](https://pypi.org/project/domain-security-analyzer/)
+[![Python versions](https://img.shields.io/pypi/pyversions/domain-security-analyzer.svg)](https://pypi.org/project/domain-security-analyzer/)
+[![Downloads](https://img.shields.io/pypi/dm/domain-security-analyzer.svg)](https://pypi.org/project/domain-security-analyzer/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A comprehensive Python tool for analyzing domain security configurations including DNS records, email security policies, subdomain discovery, and **Subresource Integrity (SRI) scanning**. The tool performs parallel analysis of domain portfolios to identify potential security configuration issues and modern security compliance gaps.
 
 ## Features
@@ -39,6 +44,25 @@ A comprehensive Python tool for analyzing domain security configurations includi
 
 ### **Installation**
 
+Install from PyPI (recommended):
+
+```bash
+pip install domain-security-analyzer
+```
+
+This installs the dependencies automatically and adds the `domain-analyzer`
+command to your `PATH`.
+
+#### From source
+
+```bash
+git clone https://github.com/CallMarcus/domain-security-analyzer.git
+cd domain-security-analyzer
+pip install -e .
+```
+
+#### Dependencies only (running the script directly)
+
 ```bash
 # Install required dependencies
 pip install dnspython requests beautifulsoup4
@@ -47,7 +71,7 @@ pip install dnspython requests beautifulsoup4
 pip install -r requirements.txt
 ```
 
-The script automatically validates dependencies and provides installation guidance:
+When run as a script, the tool automatically validates dependencies and provides installation guidance:
 
 ```bash
 $ python domain_analyzer.py
@@ -72,16 +96,25 @@ contoso.com
 rzy.domain.com
 ```
 
-Run the analyzer and specify the output CSV file:
+Run the analyzer and specify the output CSV file. If installed from PyPI, use the
+`domain-analyzer` command:
 
 ```bash
-python domain_analyzer.py examples/domains.txt report.csv
+domain-analyzer examples/domains.txt report.csv
 ```
 
 You can optionally set the number of parallel workers:
 
 ```bash
-python domain_analyzer.py examples/domains.txt report.csv 20
+domain-analyzer examples/domains.txt report.csv 20
+```
+
+The same interface is available via `python -m domain_security_analyzer` or, for
+backward compatibility, by running the script directly:
+
+```bash
+python -m domain_security_analyzer examples/domains.txt report.csv
+python domain_analyzer.py examples/domains.txt report.csv   # legacy shim
 ```
 
 The generated CSV includes comprehensive security analysis with **29 columns**:
