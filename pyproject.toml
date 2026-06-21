@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "domain-security-analyzer"
+dynamic = ["version"]
+description = "Analyze domain security configurations: DNS, email authentication (SPF/DKIM/DMARC), subdomain discovery, and Subresource Integrity (SRI) scanning."
+readme = "README.md"
+requires-python = ">=3.7"
+license = { text = "MIT" }
+authors = [{ name = "CallMarcus" }]
+keywords = [
+    "security",
+    "dns",
+    "sri",
+    "domain-analysis",
+    "cybersecurity",
+    "spf",
+    "dkim",
+    "dmarc",
+    "securityscorecard",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Information Technology",
+    "Topic :: Security",
+    "Topic :: Internet :: Name Service (DNS)",
+    "Topic :: System :: Networking :: Monitoring",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "dnspython>=2.4.0",
+    "requests>=2.28.0",
+    "beautifulsoup4>=4.11.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/CallMarcus/domain-security-analyzer"
+Repository = "https://github.com/CallMarcus/domain-security-analyzer"
+Issues = "https://github.com/CallMarcus/domain-security-analyzer/issues"
+Changelog = "https://github.com/CallMarcus/domain-security-analyzer/blob/main/CHANGELOG.md"
+
+[project.scripts]
+domain-analyzer = "domain_security_analyzer.cli:main"
+
+[tool.setuptools]
+py-modules = ["domain_analyzer"]
+
+[tool.setuptools.packages.find]
+include = ["domain_security_analyzer*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "domain_security_analyzer.__version__.__version__" }
