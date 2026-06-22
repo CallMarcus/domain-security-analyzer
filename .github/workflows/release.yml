@@ -4,8 +4,12 @@ name: Release
 # are stored in GitHub.
 #
 # Triggers:
+#   * Pushing a version tag (v*)   -> builds and uploads to PyPI.
 #   * Publishing a GitHub Release  -> builds and uploads to PyPI.
 #   * Manual "Run workflow"        -> builds and uploads to TestPyPI (staging).
+#
+# To cut a release: `git tag v1.2.3 && git push origin v1.2.3`
+# (setuptools-scm stamps the build with the tag, so the version is 1.2.3).
 #
 # One-time setup on the package index (no secrets needed afterwards):
 #   PyPI:     https://pypi.org/manage/account/publishing/
@@ -18,6 +22,9 @@ name: Release
 #     - Environment:       pypi   (for PyPI)  /  testpypi  (for TestPyPI)
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types: [published]
   workflow_dispatch:
@@ -69,8 +76,8 @@ jobs:
 
   publish-pypi:
     name: Publish to PyPI
-    # Only a published GitHub Release uploads to production PyPI.
-    if: github.event_name == 'release'
+    # A pushed version tag or a published GitHub Release uploads to production PyPI.
+    if: github.event_name == 'push' || github.event_name == 'release'
     needs: build
     runs-on: ubuntu-latest
     environment:
