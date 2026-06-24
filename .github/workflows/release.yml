@@ -5,7 +5,8 @@ name: Release
 #
 # Triggers:
 #   * Pushing a version tag (v*)   -> builds and uploads to PyPI.
-#   * Publishing a GitHub Release  -> builds and uploads to PyPI.
+#     (Publishing a GitHub Release that creates a new tag fires this same
+#      event, so the Release UI flow works too — as a single run.)
 #   * Manual "Run workflow"        -> builds and uploads to TestPyPI (staging).
 #
 # To cut a release: `git tag v1.2.3 && git push origin v1.2.3`
@@ -25,8 +26,6 @@ on:
   push:
     tags:
       - 'v*'
-  release:
-    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -73,11 +72,13 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
 
   publish-pypi:
     name: Publish to PyPI
-    # A pushed version tag or a published GitHub Release uploads to production PyPI.
-    if: github.event_name == 'push' || github.event_name == 'release'
+    # A pushed version tag (incl. tags created by publishing a GitHub Release)
+    # uploads to production PyPI.
+    if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     environment:
@@ -93,3 +94,5 @@ jobs:
           path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
