@@ -7,3 +7,5 @@ include requirements.txt
 recursive-include docs *.md
 recursive-include examples *
 include scripts/*.py
+recursive-include domain_security_analyzer/web/templates *.html
+recursive-include domain_security_analyzer/web/static *.css

@@ -25,7 +25,7 @@ jobs:
       - name: Install package and test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
+          pip install -e ".[web]"
           pip install pytest
       - name: Run tests
         run: pytest -q
@@ -34,6 +34,7 @@ jobs:
           domain-analyzer --version
           domain-analyzer --help
           python -m domain_security_analyzer --version
+          domain-analyzer-web --help
 
   build:
     name: build & metadata check

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Analyze domains</h1>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<form method="post" action="{{ url_for('run') }}" enctype="multipart/form-data" class="card">
+  <label for="domains">Domains (one per line)</label>
+  <textarea id="domains" name="domains" rows="10" placeholder="example.com&#10;example.org&#10;# lines starting with # are ignored"></textarea>
+
+  <label for="file">…or upload a .txt file</label>
+  <input type="file" id="file" name="file" accept=".txt,text/plain">
+
+  <div class="row">
+    <label for="max_workers">Parallel workers</label>
+    <input type="number" id="max_workers" name="max_workers" value="10" min="1" max="50">
+  </div>
+
+  <button type="submit">Run analysis</button>
+</form>
+
+<h2>Previous runs</h2>
+{% if runs %}
+<table class="runs">
+  <thead><tr><th>Run</th><th></th></tr></thead>
+  <tbody>
+    {% for run in runs %}
+    <tr>
+      <td>{{ label(run) }}</td>
+      <td class="actions">
+        <a href="{{ url_for('results', run_name=run.name) }}">View</a>
+        <a href="{{ url_for('download', run_name=run.name) }}">Download CSV</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No runs yet. Your first analysis will appear here.</p>
+{% endif %}
+{% endblock %}

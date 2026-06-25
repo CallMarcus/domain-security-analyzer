@@ -44,8 +44,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+web = [
+    "flask>=3.0",
+]
 dev = [
     "pytest>=7.0",
+    "flask>=3.0",
     "build",
     "twine",
 ]
@@ -58,12 +62,17 @@ Changelog = "https://github.com/CallMarcus/domain-security-analyzer/blob/main/CH
 
 [project.scripts]
 domain-analyzer = "domain_security_analyzer.cli:main"
+domain-analyzer-web = "domain_security_analyzer.web.cli:main"
 
 [tool.setuptools]
 py-modules = ["domain_analyzer"]
 
 [tool.setuptools.packages.find]
 include = ["domain_security_analyzer*"]
+
+# Ship the web UI's templates and static assets inside the wheel.
+[tool.setuptools.package-data]
+"domain_security_analyzer.web" = ["templates/*.html", "static/*.css"]
 
 # Version is derived from git tags (single source of truth). Tag `v1.2.3`
 # produces version `1.2.3`; commits after a tag get a dev/local suffix.

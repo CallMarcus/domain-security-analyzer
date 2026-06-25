@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Analyzing…</h1>
+
+<div class="card">
+  <div class="progress"><div id="bar" class="bar" style="width:0%"></div></div>
+  <p id="status">Starting analysis of {{ job.total }} domain(s)…</p>
+  <p id="failed" class="error" hidden></p>
+</div>
+
+<script>
+  const jobId = {{ job.id | tojson }};
+  const statusUrl = "{{ url_for('run_status', job_id=job.id) }}";
+
+  async function poll() {
+    try {
+      const res = await fetch(statusUrl);
+      const data = await res.json();
+      const total = data.total || 1;
+      const pct = Math.round((data.completed / total) * 100);
+      document.getElementById("bar").style.width = pct + "%";
+      document.getElementById("status").textContent =
+        data.completed + " / " + data.total + " domains analyzed (" + pct + "%)";
+
+      if (data.status === "done" && data.result_url) {
+        window.location.href = data.result_url;
+        return;
+      }
+      if (data.status === "error") {
+        const el = document.getElementById("failed");
+        el.hidden = false;
+        el.textContent = "Analysis failed: " + (data.error || "unknown error");
+        return;
+      }
+    } catch (e) {
+      /* transient fetch error — keep polling */
+    }
+    setTimeout(poll, 1000);
+  }
+  poll();
+</script>
+{% endblock %}

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **SRI library API**: Subresource Integrity analysis is now importable from the
+  installed package (`from domain_security_analyzer.sri import scan_url`),
+  returning a structured report with per-resource integrity/crossorigin values,
+  machine-readable reason codes, observed CSP headers, and compensating-control
+  detection. `scripts/sri_parser.py` is now a thin CLI wrapper over it.
+- **Local web UI** (optional `web` extra): `pip install domain-security-analyzer[web]`
+  adds a `domain-analyzer-web` command that serves a localhost Flask app to
+  upload domain lists, watch analysis progress, download the standard 29-column
+  CSV, and diff the two most recent runs (highlighting security regressions vs.
+  improvements). Runs are stored under `~/.domain-security-analyzer/runs/`
+  (override via `DSA_DATA_DIR`).
+
+### Changed
+
+- `analyzer.py` exposes a reusable `write_results_csv()` helper, a shared
+  `CSV_COLUMNS` constant, and an optional `progress_callback` on
+  `analyze_domains_from_file` (used by the web UI). Backward compatible.
+
 ## [1.0.0] - 2026-06-21
 
 First packaged release, distributable via PyPI.

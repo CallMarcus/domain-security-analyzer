@@ -8,7 +8,7 @@ importable API for the package. The command-line interface lives in
 import concurrent.futures
 import csv
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 from urllib.parse import urlparse
 
 import dns.resolver
@@ -401,8 +401,95 @@ class DomainAnalyzer:
         }
 
 
-def analyze_domains_from_file(input_file: str, output_file: str, max_workers: int = 10, *, include_wildcard_matches: bool = False, filtered_subdomains_file: Optional[str] = None):
-    """Analyze multiple domains from a file and save results to CSV."""
+# Column order for the analysis report CSV. Kept as a module-level constant so
+# consumers (CLI, web UI, diff tooling) share one source of truth.
+CSV_COLUMNS = [
+    'Domain',
+    'Timestamp',
+    'Parent Domain',
+    'SOA Exists',
+    'SOA Record',
+    'Primary NS',
+    'Admin Email',
+    'SPF Exists',
+    'SPF Record',
+    'DKIM Exists',
+    'DKIM Records',
+    'DMARC Exists',
+    'DMARC Record',
+    'Discovered Subdomains',
+    'CNAME Records',
+    'Has Wildcard DNS',
+    'Hosting Provider',
+    'HTTP Accessible',
+    'Redirects to HTTPS',
+    'Final URL',
+    'Redirect Chain',
+    'HTTP Error',
+    'SRI Enabled',
+    'Total External Resources',
+    'Resources With SRI',
+    'SRI Coverage %',
+    'Missing SRI Count',
+    'SRI Algorithms Used',
+    'SRI Error',
+]
+
+
+def _result_to_row(r: Dict) -> list:
+    """Flatten one analysis result dict into a CSV row matching CSV_COLUMNS."""
+    return [
+        r['domain'],
+        r['timestamp'],
+        r['soa']['parent_domain'],
+        r['soa']['exists'],
+        r['soa'].get('record'),
+        r['soa'].get('primary_ns'),
+        r['soa'].get('admin_email'),
+        r['spf']['exists'],
+        r['spf'].get('record'),
+        r['dkim']['exists'],
+        ';'.join([f"{rec['selector']}:{rec['record']}" for rec in r['dkim']['records']]) if r['dkim']['records'] else '',
+        r['dmarc']['exists'],
+        r['dmarc'].get('record'),
+        ','.join(r['subdomains']['subdomains']),
+        ','.join([f"{k}:{v}" for k, v in r['subdomains']['cname_records'].items()]),
+        r['subdomains']['has_wildcard_dns'],
+        r['subdomains']['hosting_provider'],
+        r['http_redirect']['http_accessible'],
+        r['http_redirect']['redirects_to_https'],
+        r['http_redirect']['final_url'],
+        ' -> '.join(r['http_redirect'].get('redirect_chain', [])),
+        r['http_redirect']['error'],
+        r['sri']['sri_enabled'],
+        r['sri']['total_external_resources'],
+        r['sri']['resources_with_sri'],
+        r['sri']['sri_coverage_percentage'],
+        r['sri']['missing_sri_count'],
+        ','.join(r['sri']['sri_algorithms_used']) if r['sri']['sri_algorithms_used'] else '',
+        r['sri']['error'],
+    ]
+
+
+def write_results_csv(results: List[Dict], output_file: str) -> None:
+    """Write analysis result dicts to ``output_file`` as the standard report CSV.
+
+    Shared by the CLI and the web UI so the 29-column layout has a single
+    definition.
+    """
+    with open(output_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(CSV_COLUMNS)
+        for r in results:
+            writer.writerow(_result_to_row(r))
+
+
+def analyze_domains_from_file(input_file: str, output_file: str, max_workers: int = 10, *, include_wildcard_matches: bool = False, filtered_subdomains_file: Optional[str] = None, progress_callback: Optional[Callable[[int, int], None]] = None):
+    """Analyze multiple domains from a file and save results to CSV.
+
+    ``progress_callback``, if given, is invoked as ``callback(completed, total)``
+    after each domain finishes — used by the web UI to drive a progress bar.
+    """
 
     # Read domains from input file
     with open(input_file, 'r') as f:
@@ -434,6 +521,11 @@ def analyze_domains_from_file(input_file: str, output_file: str, max_workers: in
 
         completed += 1
         print(f"Progress: {completed}/{total_domains} domains analyzed ({(completed/total_domains)*100:.1f}%)")
+        if progress_callback is not None:
+            try:
+                progress_callback(completed, total_domains)
+            except Exception:
+                pass  # progress reporting must never break analysis
         return result
 
     results = []
@@ -466,74 +558,7 @@ def analyze_domains_from_file(input_file: str, output_file: str, max_workers: in
                 results.append(error_result)
 
     # Write results to CSV
-    with open(output_file, 'w', newline='') as f:
-        writer = csv.writer(f)
-        # Write header
-        writer.writerow([
-            'Domain',
-            'Timestamp',
-            'Parent Domain',
-            'SOA Exists',
-            'SOA Record',
-            'Primary NS',
-            'Admin Email',
-            'SPF Exists',
-            'SPF Record',
-            'DKIM Exists',
-            'DKIM Records',
-            'DMARC Exists',
-            'DMARC Record',
-            'Discovered Subdomains',
-            'CNAME Records',
-            'Has Wildcard DNS',
-            'Hosting Provider',
-            'HTTP Accessible',
-            'Redirects to HTTPS',
-            'Final URL',
-            'Redirect Chain',
-            'HTTP Error',
-            'SRI Enabled',
-            'Total External Resources',
-            'Resources With SRI',
-            'SRI Coverage %',
-            'Missing SRI Count',
-            'SRI Algorithms Used',
-            'SRI Error'
-        ])
-
-        # Write results
-        for r in results:
-            writer.writerow([
-                r['domain'],
-                r['timestamp'],
-                r['soa']['parent_domain'],
-                r['soa']['exists'],
-                r['soa'].get('record'),
-                r['soa'].get('primary_ns'),
-                r['soa'].get('admin_email'),
-                r['spf']['exists'],
-                r['spf'].get('record'),
-                r['dkim']['exists'],
-                ';'.join([f"{rec['selector']}:{rec['record']}" for rec in r['dkim']['records']]) if r['dkim']['records'] else '',
-                r['dmarc']['exists'],
-                r['dmarc'].get('record'),
-                ','.join(r['subdomains']['subdomains']),
-                ','.join([f"{k}:{v}" for k, v in r['subdomains']['cname_records'].items()]),
-                r['subdomains']['has_wildcard_dns'],
-                r['subdomains']['hosting_provider'],
-                r['http_redirect']['http_accessible'],
-                r['http_redirect']['redirects_to_https'],
-                r['http_redirect']['final_url'],
-                ' -> '.join(r['http_redirect'].get('redirect_chain', [])),
-                r['http_redirect']['error'],
-                r['sri']['sri_enabled'],
-                r['sri']['total_external_resources'],
-                r['sri']['resources_with_sri'],
-                r['sri']['sri_coverage_percentage'],
-                r['sri']['missing_sri_count'],
-                ','.join(r['sri']['sri_algorithms_used']) if r['sri']['sri_algorithms_used'] else '',
-                r['sri']['error']
-            ])
+    write_results_csv(results, output_file)
 
     # Optionally write filtered subdomains to a separate CSV
     if filtered_subdomains_file:
