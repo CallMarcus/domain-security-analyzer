@@ -219,6 +219,30 @@ and short reason codes for each unsafe include. When `--list-sri` is supplied th
 output also enumerates each external script and stylesheet that defines an
 `integrity` attribute.
 
+### Use as a library
+
+The same analysis is available as an importable API from the installed package,
+so other tools (e.g. a findings/dispute workflow) can reuse it instead of
+reimplementing SRI parsing:
+
+```python
+from domain_security_analyzer.sri import scan_url
+
+# Inspect a single page (default); pass crawl=True to follow same-origin links.
+report = scan_url("https://example.com")
+
+for resource in report["unsafe_resources"]:
+    print(resource["resource_url"], resource["reasons"])
+
+if report["compensating_control_detected"]:
+    print("A restrictive Content-Security-Policy is acting as a compensating control")
+```
+
+Each entry in `unsafe_resources` carries the raw `integrity`/`crossorigin`
+values plus machine-readable `reasons`: `missing-integrity`,
+`invalid-integrity-hash`, `mixed-invalid-hashes`, `non-https-resource`, and
+`missing-crossorigin`. For full control, use the `SRIParser` class directly.
+
 ## Documentation
 
 ### **Reference Guides**

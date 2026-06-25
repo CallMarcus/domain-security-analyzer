@@ -1,288 +1,36 @@
-"""SRI Parser - crawl a site for unsafe Subresource Integrity usage.
+"""SRI Parser CLI - crawl a site for unsafe Subresource Integrity usage.
 
-This script inspects pages on a given site, looks for external JavaScript
-and stylesheet resources, and reports which ones violate SecurityScorecard's
-"unsafe SRI" criteria. It also checks for a compensating control in the form
-of a restrictive Content-Security-Policy header.
+The reusable analysis logic now lives in the installed package at
+``domain_security_analyzer.sri`` (see issue #18 / PyPI packaging). This script
+is a thin command-line wrapper kept for backward compatibility, so existing
+``python scripts/sri_parser.py <url>`` invocations keep working. For
+programmatic use prefer::
+
+    from domain_security_analyzer.sri import scan_url
 """
 from __future__ import annotations
 
 import argparse
-import collections
 import json
-import re
-from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Set, Tuple
-from urllib.parse import urljoin, urlparse
+import os
+import sys
+from typing import Dict
 
-import requests
-from bs4 import BeautifulSoup
-
-# Regular expression to validate integrity hashes (sha256/sha384/sha512)
-INTEGRITY_PATTERN = re.compile(r"^(sha(256|384|512))-[A-Za-z0-9+/=]+$")
-
-# Tokens in script-src that indicate the policy is not restrictive enough to
-# qualify as a compensating control.
-PERMISSIVE_SCRIPT_TOKENS = {
-    "*",
-    "http:",
-    "https:",
-    "data:",
-    "blob:",
-    "filesystem:",
-    "'unsafe-inline'",
-    "'unsafe-eval'",
-}
-
-
-@dataclass
-class UnsafeResource:
-    page_url: str
-    resource_url: str
-    tag_type: str
-    integrity: Optional[str]
-    crossorigin: Optional[str]
-    reasons: List[str] = field(default_factory=list)
-
-
-class SRIParser:
-    """Crawl a site and report unsafe Subresource Integrity usage."""
-
-    def __init__(
-        self,
-        base_url: str,
-        max_depth: int = 0,
-        max_pages: int = 1,
-        timeout: int = 10,
-        user_agent: str = "SRI-Parser/1.0 (+https://github.com/security-domain/domain-security-analyzer)",
-    ) -> None:
-        parsed = urlparse(base_url)
-        if not parsed.scheme:
-            base_url = f"https://{base_url}"
-            parsed = urlparse(base_url)
-
-        if not parsed.netloc:
-            raise ValueError("A valid domain or URL is required")
-
-        self.base_url = base_url.rstrip('/') or base_url
-        self.base_netloc = parsed.netloc.lower()
-        self.max_depth = max_depth
-        self.max_pages = max_pages
-        self.timeout = timeout
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": user_agent})
-
-        self.visited: Set[str] = set()
-        self.to_visit: collections.deque[Tuple[str, int]] = collections.deque([(self.base_url, 0)])
-        self.unsafe_resources: List[UnsafeResource] = []
-        self.csp_policies: List[Tuple[str, str, str]] = []  # (page_url, header_name, policy_value)
-        self.resources_with_integrity: List[Dict[str, object]] = []
-
-    # ------------------------------------------------------------------
-    # Crawling helpers
-    # ------------------------------------------------------------------
-    def _is_same_origin(self, url: str) -> bool:
-        if not url:
-            return False
-        parsed = urlparse(url)
-        if not parsed.scheme:
-            return True  # relative URL -> same origin
-        return parsed.netloc.lower() == self.base_netloc
-
-    def _is_external_resource(self, url: str) -> bool:
-        if not url or not url.startswith(("http://", "https://")):
-            return False
-        parsed = urlparse(url)
-        resource_domain = parsed.netloc.lower().replace("www.", "")
-        base_domain = self.base_netloc.replace("www.", "")
-        return resource_domain != base_domain
-
-    def _fetch(self, url: str) -> Optional[requests.Response]:
-        try:
-            response = self.session.get(url, timeout=self.timeout, allow_redirects=True)
-            if "text/html" not in response.headers.get("content-type", ""):
-                return None
-            return response
-        except requests.RequestException:
-            return None
-
-    def _extract_links(self, html: str, page_url: str) -> Iterable[str]:
-        soup = BeautifulSoup(html, "html.parser")
-        for anchor in soup.find_all("a", href=True):
-            href = urljoin(page_url, anchor.get("href"))
-            if self._is_same_origin(href):
-                yield href.split("#", 1)[0]
-
-    # ------------------------------------------------------------------
-    # SRI evaluation
-    # ------------------------------------------------------------------
-    def _parse_integrity_tokens(self, integrity: str) -> Tuple[List[str], List[str]]:
-        valid_tokens: List[str] = []
-        invalid_tokens: List[str] = []
-        for token in integrity.split():
-            if INTEGRITY_PATTERN.match(token.strip()):
-                valid_tokens.append(token)
-            else:
-                invalid_tokens.append(token)
-        return valid_tokens, invalid_tokens
-
-    def _analyze_resource(self, tag, tag_type: str, page_url: str) -> Optional[UnsafeResource]:
-        src_attr = "src" if tag_type == "script" else "href"
-        resource_url = tag.get(src_attr)
-        if not resource_url:
-            return None
-
-        resource_url = urljoin(page_url, resource_url)
-        if not self._is_external_resource(resource_url):
-            return None
-
-        integrity = tag.get("integrity")
-        crossorigin = tag.get("crossorigin")
-        parsed = urlparse(resource_url)
-        reasons: List[str] = []
-
-        valid_hashes: List[str] = []
-        invalid_hashes: List[str] = []
-
-        if integrity:
-            valid_hashes, invalid_hashes = self._parse_integrity_tokens(integrity)
-            self.resources_with_integrity.append(
-                {
-                    "page_url": page_url,
-                    "resource_url": resource_url,
-                    "tag_type": tag_type,
-                    "integrity": integrity,
-                    "crossorigin": crossorigin,
-                    "valid_hashes": valid_hashes,
-                    "invalid_hashes": invalid_hashes,
-                }
-            )
-        else:
-            reasons.append("missing-integrity")
-
-        if integrity:
-            if not valid_hashes:
-                reasons.append("invalid-integrity-hash")
-            elif invalid_hashes:
-                reasons.append("mixed-invalid-hashes")
-
-        if parsed.scheme != "https":
-            reasons.append("non-https-resource")
-
-        if self._is_cross_origin(parsed) and not crossorigin:
-            reasons.append("missing-crossorigin")
-
-        if reasons:
-            return UnsafeResource(
-                page_url=page_url,
-                resource_url=resource_url,
-                tag_type=tag_type,
-                integrity=integrity,
-                crossorigin=crossorigin,
-                reasons=reasons,
-            )
-        return None
-
-    def _is_cross_origin(self, parsed_url) -> bool:
-        return parsed_url.netloc.lower() != self.base_netloc
-
-    # ------------------------------------------------------------------
-    # CSP evaluation
-    # ------------------------------------------------------------------
-    def _record_csp(self, page_url: str, response: requests.Response) -> None:
-        for header_name in ("Content-Security-Policy", "Content-Security-Policy-Report-Only"):
-            policy = response.headers.get(header_name)
-            if policy:
-                self.csp_policies.append((page_url, header_name, policy))
-
-    def _has_compensating_csp(self) -> bool:
-        for _, _, policy in self.csp_policies:
-            directives = self._parse_csp(policy)
-            script_sources = directives.get("script-src") or directives.get("default-src")
-            if not script_sources:
-                continue
-
-            lower_tokens = [token.lower() for token in script_sources]
-            if any(token in PERMISSIVE_SCRIPT_TOKENS for token in lower_tokens):
-                continue
-
-            has_specific_allowlist = any(
-                token.startswith("'self'")
-                or token.startswith("'nonce-")
-                or token.startswith("'sha")
-                or token.startswith("https://")
-                or token.startswith("http://")
-                or "." in token
-                for token in lower_tokens
-            )
-            if has_specific_allowlist:
-                return True
-        return False
-
-    def _parse_csp(self, policy: str) -> Dict[str, List[str]]:
-        directives: Dict[str, List[str]] = {}
-        for directive in policy.split(";"):
-            directive = directive.strip()
-            if not directive:
-                continue
-            parts = directive.split()
-            if not parts:
-                continue
-            name = parts[0].lower()
-            sources = parts[1:]
-            directives[name] = sources
-        return directives
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-    def crawl(self) -> Dict[str, object]:
-        pages_crawled = 0
-        while self.to_visit and pages_crawled < self.max_pages:
-            url, depth = self.to_visit.popleft()
-            if url in self.visited or depth > self.max_depth:
-                continue
-
-            response = self._fetch(url)
-            self.visited.add(url)
-            if not response:
-                continue
-
-            pages_crawled += 1
-            html = response.text
-            self._record_csp(url, response)
-
-            soup = BeautifulSoup(html, "html.parser")
-            for script in soup.find_all("script", src=True):
-                unsafe = self._analyze_resource(script, "script", url)
-                if unsafe:
-                    self.unsafe_resources.append(unsafe)
-
-            for link in soup.find_all("link", href=True):
-                rel = link.get("rel") or []
-                if "stylesheet" in [r.lower() for r in rel]:
-                    unsafe = self._analyze_resource(link, "stylesheet", url)
-                    if unsafe:
-                        self.unsafe_resources.append(unsafe)
-
-            if depth < self.max_depth:
-                for href in self._extract_links(html, url):
-                    if href not in self.visited:
-                        self.to_visit.append((href, depth + 1))
-
-        report = {
-            "base_url": self.base_url,
-            "pages_crawled": pages_crawled,
-            "unsafe_resources": [unsafe.__dict__ for unsafe in self.unsafe_resources],
-            "compensating_control_detected": self._has_compensating_csp(),
-            "csp_policies": [
-                {"page_url": page_url, "header": header, "value": policy}
-                for page_url, header, policy in self.csp_policies
-            ],
-            "resources_with_integrity_count": len(self.resources_with_integrity),
-            "resources_with_integrity": self.resources_with_integrity,
-        }
-        return report
+try:
+    from domain_security_analyzer.sri import (  # noqa: F401  (re-exported)
+        INTEGRITY_PATTERN,
+        SRIParser,
+        UnsafeResource,
+        scan_url,
+    )
+except ModuleNotFoundError:  # pragma: no cover - running from a source checkout
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from domain_security_analyzer.sri import (  # noqa: F401  (re-exported)
+        INTEGRITY_PATTERN,
+        SRIParser,
+        UnsafeResource,
+        scan_url,
+    )
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -386,13 +134,13 @@ def main() -> None:
     parser = build_arg_parser()
     args = parser.parse_args()
 
-    sri_parser = SRIParser(
-        base_url=args.url,
-        max_depth=args.max_depth if args.crawl else 0,
-        max_pages=args.max_pages if args.crawl else 1,
+    report = scan_url(
+        args.url,
+        crawl=args.crawl,
+        max_depth=args.max_depth,
+        max_pages=args.max_pages,
         timeout=args.timeout,
     )
-    report = sri_parser.crawl()
     print_report(report, as_json=args.json, list_all=args.list_sri)
 
 

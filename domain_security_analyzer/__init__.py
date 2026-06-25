@@ -7,5 +7,13 @@ Integrity (SRI) scanning.
 
 from .__version__ import __version__
 from .analyzer import DomainAnalyzer, analyze_domains_from_file
+from .sri import SRIParser, UnsafeResource, scan_url
 
-__all__ = ["DomainAnalyzer", "analyze_domains_from_file", "__version__"]
+__all__ = [
+    "DomainAnalyzer",
+    "analyze_domains_from_file",
+    "SRIParser",
+    "UnsafeResource",
+    "scan_url",
+    "__version__",
+]
