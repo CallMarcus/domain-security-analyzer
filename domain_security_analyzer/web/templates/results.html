@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Run results</h1>
+<p class="muted">{{ label }} &middot; {{ rows|length }} domain(s)</p>
+
+<p class="actions">
+  <a class="button" href="{{ url_for('download', run_name=run_name) }}">Download CSV</a>
+  <a href="{{ url_for('changes') }}">Compare with previous run →</a>
+</p>
+
+{% if rows %}
+<div class="table-scroll">
+  <table class="results">
+    <thead>
+      <tr>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>{% for col in columns %}<td>{{ row[col] }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="muted">This run has no rows.</p>
+{% endif %}
+{% endblock %}

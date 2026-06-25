@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Changes between runs</h1>
+
+{% if insufficient %}
+<p class="muted">
+  Need at least two runs to compare — there {{ 'is' if run_count == 1 else 'are' }}
+  currently {{ run_count }}. Run another analysis, then come back.
+</p>
+{% else %}
+<p class="muted">Comparing <strong>{{ old_label }}</strong> → <strong>{{ new_label }}</strong></p>
+
+<div class="summary">
+  <span class="pill regression">{{ diff.regression_count }} regression(s)</span>
+  <span class="pill improvement">{{ diff.improvement_count }} improvement(s)</span>
+  <span class="pill">{{ diff.added|length }} added</span>
+  <span class="pill">{{ diff.removed|length }} removed</span>
+</div>
+
+{% if diff.added %}
+<h2>Domains added</h2>
+<ul>{% for d in diff.added %}<li>{{ d }}</li>{% endfor %}</ul>
+{% endif %}
+
+{% if diff.removed %}
+<h2>Domains removed</h2>
+<ul>{% for d in diff.removed %}<li>{{ d }}</li>{% endfor %}</ul>
+{% endif %}
+
+{% if diff.changed %}
+<h2>Changed domains</h2>
+{% for c in diff.changed %}
+<div class="card change">
+  <h3>{{ c.domain }}</h3>
+  {% for r in c.regressions %}
+    <div class="delta regression">▼ {{ r.field }}: <code>{{ r.old }}</code> → <code>{{ r.new }}</code></div>
+  {% endfor %}
+  {% for i in c.improvements %}
+    <div class="delta improvement">▲ {{ i.field }}: <code>{{ i.old }}</code> → <code>{{ i.new }}</code></div>
+  {% endfor %}
+  {% for o in c.other %}
+    <div class="delta other">• {{ o.field }}: <code>{{ o.old }}</code> → <code>{{ o.new }}</code></div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% else %}
+<p class="muted">No per-domain field changes between these two runs.</p>
+{% endif %}
+{% endif %}
+{% endblock %}

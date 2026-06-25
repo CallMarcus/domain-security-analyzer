@@ -117,6 +117,32 @@ python -m domain_security_analyzer examples/domains.txt report.csv
 python domain_analyzer.py examples/domains.txt report.csv   # legacy shim
 ```
 
+### Web UI (local app)
+
+Prefer a browser? Install the optional `web` extra and launch a small local app
+to upload domains, watch progress, download the report, and compare runs — no
+command line needed after launch:
+
+```bash
+pip install "domain-security-analyzer[web]"
+domain-analyzer-web --open          # serves http://127.0.0.1:8000 and opens it
+```
+
+The app lets you:
+
+- **Upload** domains by pasting them (one per line, `#` comments ignored) or
+  dropping a `.txt` file.
+- **Watch progress** as the analysis runs in the background.
+- **Download** the standard 29-column CSV for any run.
+- **View changes** — each run is saved locally and the *Changes* page diffs the
+  two most recent runs, highlighting security **regressions** (e.g. SPF/DMARC
+  lost, SRI coverage dropped) and **improvements**, plus domains added/removed.
+
+It binds to `127.0.0.1` only and stores runs under
+`~/.domain-security-analyzer/runs/` (override with the `DSA_DATA_DIR`
+environment variable). This is a single-user local tool — it is not meant to be
+exposed to a network.
+
 The generated CSV includes comprehensive security analysis with **29 columns**:
 
 ### **Domain & Infrastructure**
